@@ -82,6 +82,53 @@
     - [Naming](#naming)
     - [Billing granularity](#billing-granularity)
     - [Source code](#source-code)
+- [Networking](#networking-1)
+  - [Networking basics](#networking-basics)
+    - [IP addresses](#ip-addresses)
+    - [IPv4 notation](#ipv4-notation)
+    - [CIDR notation](#cidr-notation)
+  - [Amazon Virtual Private Cloud](#amazon-virtual-private-cloud)
+    - [Create a subnet](#create-a-subnet)
+    - [High availability with a VPC](#high-availability-with-a-vpc)
+    - [Reserved IPs](#reserved-ips)
+    - [Gateways](#gateways)
+      - [Internet gateway](#internet-gateway)
+      - [Virtual private gateway](#virtual-private-gateway)
+  - [VPC Routing](#vpc-routing)
+    - [Main route table](#main-route-table)
+    - [Custom route tables](#custom-route-tables)
+  - [VPC Security](#vpc-security)
+    - [Secure subnets with network access control lists](#secure-subnets-with-network-access-control-lists)
+    - [Secure EC2 instances with security groups](#secure-ec2-instances-with-security-groups)
+- [Storage](#storage)
+  - [Types](#types)
+    - [File Storage](#file-storage)
+    - [Block storage](#block-storage)
+    - [Object storage](#object-storage)
+    - [Relate back to traditional storage systems](#relate-back-to-traditional-storage-systems)
+  - [EC2 instance store and Block Storage](#ec2-instance-store-and-block-storage)
+    - [Amazon Elastic Block Storage (Amazon EBS)](#amazon-elastic-block-storage-amazon-ebs)
+    - [Scale Amazon EBS volumes](#scale-amazon-ebs-volumes)
+    - [Amazon EBS use cases](#amazon-ebs-use-cases)
+    - [Amazon EBS volume types](#amazon-ebs-volume-types)
+    - [Amazon EBS benefits](#amazon-ebs-benefits)
+    - [Amazon EBS snapshots](#amazon-ebs-snapshots)
+  - [Amazon S3](#amazon-s3)
+    - [Amazon S3 concepts](#amazon-s3-concepts)
+    - [Amazon S3 use cases](#amazon-s3-use-cases)
+    - [Choose the right connectivity option for resources](#choose-the-right-connectivity-option-for-resources)
+    - [IAM policies](#iam-policies-1)
+    - [S3 bucket policies](#s3-bucket-policies)
+    - [Amazon S3 encryption](#amazon-s3-encryption)
+    - [Amazon S3 versioning](#amazon-s3-versioning)
+    - [Versioning states](#versioning-states)
+    - [Six Amazon S3 storage classes](#six-amazon-s3-storage-classes)
+    - [Automate tier transitions with object lifecycle management](#automate-tier-transitions-with-object-lifecycle-management)
+  - [Choose the Right Storage Service](#choose-the-right-storage-service)
+    - [Amazon EC2 instance store](#amazon-ec2-instance-store)
+    - [Amazon EBS](#amazon-ebs)
+    - [Amazon S3](#amazon-s3-1)
+    - [Amazon Elastic File System (Amazon EFS) and Amazon FSx](#amazon-elastic-file-system-amazon-efs-and-amazon-fsx)
 - [Subtleties](#subtleties)
   - [IAM User vs IAM Role](#iam-user-vs-iam-role)
 
@@ -728,6 +775,634 @@ AWS rounds up duration to the nearest millisecond with no minimum execution time
 ### Source code
 
 You can find a tutorial on creating the AWS Lambda function as well as the code used in the AWS Lambda demo here: https://aws.amazon.com/blogs/compute/resize-images-on-the-fly-with-amazon-s3-aws-lambda-and-amazon-api-gateway/
+
+# Networking
+
+> Networkiing  might not be required for services like Lambda functions, it it specifically for EC2 related services
+
+## Networking basics
+
+One way to think about networking is to think about sending a letter. When you send a letter, you provide the following three elements:
+
+- The payload, or letter, inside the envelope.
+- The address of the sender in the From section.
+- The address of the recipient in the To section.
+Each address must contain specific information, such as:
+
+- Name of sender and recipient
+- Street
+- City
+- State or province
+- Zip, area, or postal code
+- Country
+You need all parts of an address to ensure that your letter gets to its destination. Without the correct address, postal workers cannot properly deliver the letter. In the digital world, computers handle the delivery of messages in a similar way. This is called routing.
+
+### IP addresses
+
+To properly route your messages to a location, you need an address. Just like each home has a mailing address, each computer has an IP address. However, instead of using the combination of street, city, state, zip code, and country, the IP address uses a combination of bits, 0s and 1s.
+
+Here is an example of a 32-bit address in binary format:
+
+![17.png](snippets/imgs/17.png)
+
+It’s called 32-bit because you have 32 digits. Feel free to count!
+
+### IPv4 notation
+
+Typically, you don’t see an IP address in its binary format. Instead, it’s converted into decimal format and noted as an Ipv4 address.
+
+In the following diagram, the 32 bits are grouped into groups of 8 bits, also called octets. Each of these groups is converted into decimal format separated by a period.
+
+![18.png](snippets/imgs/18.png)
+
+In the end, this is what is called an Ipv4 address. This is important to know when trying to communicate to a single computer. But remember, you’re working with a network. This is where CIDR notation comes in.
+
+In the end, this is what is called an Ipv4 address. This is important to know when trying to communicate to a single computer. But remember, you’re working with a network. This is where CIDR notation comes in.
+
+### CIDR notation
+
+192.168.1.30 is a single IP address. If you want to express IP addresses between the range of 192.168.1.0 and 192.168.1.255, how can you do that?
+
+One way is to use Classless Inter-Domain Routing (CIDR) notation. CIDR notation is a compressed way of specifying a range of IP addresses. Specifying a range determines how many IP addresses are available to you.
+
+CIDR notation is shown here.
+
+![19.png](snippets/imgs/19.png)
+
+It begins with a starting IP address and is separated by a forward slash (the “/” character) followed by a number. The number at the end specifies how many of the bits of the IP address are fixed. In this example, the first 24 bits of the IP address are fixed. The rest are flexible.
+
+![20.png](snippets/imgs/20.png)
+
+
+32 total bits subtracted by 24 fixed bits leaves 8 flexible bits. Each of these flexible bits can be either 0 or 1, because they are binary. That means that you have two choices for each of the 8 bits, providing 256 IP addresses in that IP range.
+
+The higher the number after the /, the smaller the number of IP addresses in your network. For example, a range of 192.168.1.0/24 is smaller than 192.168.1.0/16.
+
+When working with networks in the AWS Cloud, you choose your network size by using CIDR notation. In AWS, the smallest IP range you can have is /28, which provides 16 IP addresses. The largest IP range you can have is a /16, which provides 65,536 IP addresses.
+
+## Amazon Virtual Private Cloud
+
+A virtual private cloud (VPC) is an isolated network that you create in the AWS Cloud, similar to a traditional network in a data center. When you create a VPC, you must choose three main factors:
+
+- Name of the VPC.
+- Region where the VPC will live. Each VPC spans multiple Availability Zones within the selected Region.
+- IP range for the VPC in CIDR notation. This determines the size of your network. Each VPC can have up to four /16 IP ranges.
+Using this information, AWS will provision a network and IP addresses for that network.
+
+Using this information, AWS will provision a network and IP addresses for that network.
+
+![21.png](snippets/imgs/21.png)
+
+### Create a subnet
+
+After you create your VPC, you must create subnets inside the network. Think of subnets as smaller networks inside your base network – or virtual local area networks (VLANs) in a traditional, on-premises network. In an on-premises network, the typical use case for subnets is to isolate or optimize network traffic. In AWS, subnets are used to provide high availability and connectivity options for your resources.
+
+When you create a subnet, you must specify the following:
+
+- VPC you want your subnet to live in. In this case: VPC (10.0.0.0/16)
+- Availability Zone you want your subnet to live in. In this case: AZ1
+- CIDR block for your subnet, which must be a subset of the VPC CIDR block. In this case: 10.0.0.0/24
+When you launch an EC2 instance, you launch it inside a subnet, which will be located inside the Availability Zone you choose.
+
+![22.png](snippets/imgs/22.png)
+
+### High availability with a VPC
+
+When you create your subnets, keep high availability in mind. To maintain redundancy and fault tolerance, create at least two subnets configured in two Availability Zones.
+
+As you learned earlier, remember that “everything fails all of the time.” With the example network, if one of the AZs fails, you will still have your resources available in another AZ as backup.
+
+![23.png](snippets/imgs/23.png)
+
+
+### Reserved IPs
+
+For AWS to configure your VPC appropriately, AWS reserves five IP addresses in each subnet. These IP addresses are used for routing, Domain Name System (DNS), and network management.
+
+For example, consider a VPC with the IP range 10.0.0.0/22. The VPC includes 1,024 total IP addresses. This is divided into four equal-sized subnets, each with a /24 IP range with 256 IP addresses. Out of each of those IP ranges, there are only 251 IP addresses that can be used because AWS reserves five.
+
+![24](snippets/imgs/24.jpg)
+
+The five reserved IP addresses can impact how you design your network. A common starting place for those who are new to the cloud is to create a VPC with an IP range of /16 and create subnets with an IP range of /24. This provides a large amount of IP addresses to work with at both the VPC and subnet levels.
+
+
+### Gateways
+
+#### Internet gateway
+To enable internet connectivity for your VPC, you must create an internet gateway. Think of the gateway as similar to a modem. Just as a modem connects your computer to the internet, the internet gateway connects your VPC to the internet. Unlike your modem at home, which sometimes goes down or offline, an internet gateway is highly available and scalable. After you create an internet gateway, you attach it to your VPC.
+
+#### Virtual private gateway
+A virtual private gateway connects your AWS VPC to another private network. Once you create and attach a virtual private gateway to a VPC, the gateway acts as anchor on the AWS side of the connection. On the other side of the connection, you will need to connect a customer gateway to the other private network. A customer gateway device is a physical device or software application on your side of the connection. Once you have both gateways, you can then establish an encrypted VPN connection between the two sides.
+
+## VPC Routing
+
+### Main route table
+When you create a VPC, AWS creates a route table called the main route table. A route table contains a set of rules, called routes, that are used to determine where network traffic is directed. AWS assumes that when you create a new VPC with subnets, you want traffic to flow between them. Therefore, the default configuration of the main route table is to allow traffic between all subnets in the local network. Below is an example of a main route table.
+
+The destination and target are two main parts of this route table.
+  
+- The **destination** is a range of IP addresses where you want your traffic to go. In the example of sending a letter, you need a destination to route the letter to the appropriate place. The same is true for routing traffic. In this case, the destination is the VPC network's IP range.
+- The **target** is the connection through which to send the traffic. In this case, the traffic is routed through the local VPC network.
+
+![25](snippets/imgs/25.jpg)
+
+### Custom route tables
+While the main route table is used implicitly by subnets that do not have an explicit route table association, you might want to provide different routes on a per-subnet basis, for traffic to access resources outside of the  VPC. For example, your application might consist of a front end and a database. You can create separate subnets for the resources and provide different routes for each of them.
+
+If you associate a custom route table with a subnet, the subnet will use it instead of the main route table. Each custom route table you create will have the local route already inside it, allowing communication to flow between all resources and subnets inside the VPC. The local route cannot be deleted.
+
+![26](snippets/imgs/26.jpg)
+
+
+## VPC Security
+
+### Secure subnets with network access control lists
+
+Think of a network access control list (network ACL) as a firewall at the subnet level. A network ACL enables you to control what kind of traffic is allowed to enter or leave your subnet. You can configure this by setting up rules that define what you want to filter. Here’s an example.
+
+<table style="width:100%;"><thead><tr><th colspan="6" style="width:99.8686%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Inbound</span></th></tr></thead><tbody><tr><td style="text-align:center;width:13.4486%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Rule #&nbsp;</span></strong></td><td style="text-align:center;width:19.1401%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Type&nbsp;</span></strong></td><td style="text-align:center;width:14.1466%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Protocol</span></strong></td><td style="text-align:center;width:21.025%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Port Range</span></strong></td><td style="text-align:center;width:15.4402%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Source</span></strong></td><td style="width:16.6667%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Allow/Deny</span></strong></td></tr><tr><td style="text-align:center;width:13.4486%;">100</td><td style="text-align:center;width:19.1401%;">All IPv4 traffic&nbsp;</td><td style="text-align:center;width:14.1466%;">All</td><td style="text-align:center;width:21.025%;">All</td><td style="text-align:center;width:15.4402%;">0.0.0.0/0</td><td style="width:16.6667%;">ALLOW<br></td></tr><tr><td style="text-align:center;width:13.4486%;">*</td><td style="text-align:center;width:19.1401%;">All IPv4 traffic<br></td><td style="text-align:center;width:14.1466%;">All<br></td><td style="text-align:center;width:21.025%;">All<br></td><td style="text-align:center;width:15.4402%;">0.0.0.0/0<br></td><td style="width:16.6667%;">DENY<br></td></tr><tr><td colspan="6" style="text-align:center;width:99.8686%;background-color:rgb(0, 82, 118);"><strong><span style="color:rgb(255, 255, 255);">Outbound</span></strong></td></tr><tr><td style="text-align:center;width:13.4486%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Rule #&nbsp;</span></strong><br></td><td style="text-align:center;width:19.1401%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Type&nbsp;</span></strong><br></td><td style="text-align:center;width:14.1466%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Protocol</span></strong><br></td><td style="text-align:center;width:21.025%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Port Range</span></strong><br></td><td style="text-align:center;width:15.4402%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Destination</span></strong><br></td><td style="width:16.6667%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Allow/Deny</span></strong><br></td></tr><tr><td style="text-align:center;width:13.4486%;">100<br></td><td style="text-align:center;width:19.1401%;">All IPv4 traffic<br></td><td style="text-align:center;width:14.1466%;">All<br></td><td style="text-align:center;width:21.025%;">All<br></td><td style="text-align:center;width:15.4402%;">0.0.0.0/0<br></td><td style="width:16.6667%;">ALLOW<br></td></tr><tr><td style="text-align:center;width:13.4486%;">*<br></td><td style="text-align:center;width:19.1401%;">All IPv4 traffic<br></td><td style="text-align:center;width:14.1466%;">All<br></td><td style="text-align:center;width:21.025%;">All<br></td><td style="text-align:center;width:15.4402%;">0.0.0.0/0<br></td><td style="width:16.6667%;">DENY<br></td></tr></tbody></table>
+
+
+The default network ACL, shown in the preceding table, allows all traffic in and out of the subnet. To allow data to flow freely to the subnet, this is a good starting place.
+
+However, you might want to restrict data at the subnet level. For example, if you have a web application, you might restrict your network to allow HTTPS traffic and remote desktop protocol (RDP) traffic to your web servers.
+
+<table style="width:100%;"><thead><tr><th colspan="6" style="width:0%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Inbound</span></th></tr></thead><tbody><tr><td style="text-align:center;width:10.6891%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Rule #&nbsp;</span></strong></td><td style="text-align:center;width:16.512%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Source IP</span></strong></td><td style="text-align:center;width:6.045%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Protocol</span></strong></td><td style="text-align:center;width:9.4497%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Port&nbsp;</span></strong></td><td style="width:14.3685%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Allow/Deny</span></strong></td><td style="width:22.688%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Comments</span></strong></td></tr><tr><td style="text-align:center;width:10.6891%;">100</td><td style="text-align:center;width:16.512%;">All IPv4 traffic&nbsp;</td><td style="text-align:center;width:6.045%;">TCP</td><td style="text-align:center;width:9.4497%;">443</td><td style="width:14.3685%;">ALLOW<br></td><td style="width:22.688%;text-align:left;">Allows inbound HTTPS traffic from anywhere<br></td></tr><tr><td style="text-align:center;width:10.6891%;">130</td><td style="text-align:center;width:16.512%;">192.0.2.0/24<br></td><td style="text-align:center;width:6.045%;">TCP<br></td><td style="text-align:center;width:9.4497%;">3389<br></td><td style="width:14.3685%;">ALLOW<br></td><td style="width:22.688%;text-align:left;">Allows inbound RDP traffic to the web servers from your home network’s public IP address range (over the internet gateway)<br></td></tr><tr><td style="text-align:center;width:10.6891%;">*</td><td style="text-align:center;width:16.512%;">All IPv4 traffic<br></td><td style="text-align:center;width:6.045%;">All</td><td style="text-align:center;width:9.4497%;">All</td><td style="width:14.3685%;">DENY</td><td style="width:22.688%;text-align:left;">Denies all inbound traffic not already handled by a preceding rule (not modifiable)<br></td></tr><tr><td colspan="6" style="text-align:center;width:52.8071%;background-color:rgb(0, 82, 118);"><strong><span style="color:rgb(255, 255, 255);">Outbound</span></strong></td></tr><tr><td style="text-align:center;width:10.6891%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Rule #&nbsp;</span></strong><br></td><td style="text-align:center;width:16.512%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Destination IP</span></strong><br></td><td style="text-align:center;width:6.045%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Protocol</span></strong><br></td><td style="text-align:center;width:9.4497%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Port&nbsp;</span></strong><br></td><td style="width:14.3685%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Allow/Deny</span></strong><br></td><td style="width:22.688%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Comments</span></strong></td></tr><tr><td style="text-align:center;width:10.6891%;">120<br></td><td style="text-align:center;width:16.512%;">0.0.0.0/0<br></td><td style="text-align:center;width:6.045%;">TCP<br></td><td style="text-align:center;width:9.4497%;">1025-65535<br></td><td style="width:14.3685%;">ALLOW<br></td><td style="width:22.688%;">Allows outbound responses to clients on the internet (serving people visiting the web servers in the subnet)<br></td></tr><tr><td style="text-align:center;width:10.6891%;">*<br></td><td style="text-align:center;width:16.512%;">0.0.0.0/0<br></td><td style="text-align:center;width:6.045%;">All<br></td><td style="text-align:center;width:9.4497%;">All<br></td><td style="width:14.3685%;">DENY<br></td><td style="width:22.688%;">Denies all outbound traffic not already handled by a preceding rule (not modifiable)<br></td></tr></tbody></table>
+
+
+Notice that in the preceding network ACL example, you allow inbound 443 and outbound range 1025–65535. That’s because HTTP uses port 443 to initiate a connection and will respond to an ephemeral port. Network ACLs are considered stateless, so you need to include both the inbound and outbound ports used for the protocol. If you don’t include the outbound range, your server would respond but the traffic would never leave the subnet.
+Since network ACLs are configured by default to allow incoming and outgoing traffic, you don’t need to change their initial settings unless you need additional security layers.
+
+### Secure EC2 instances with security groups
+
+The next layer of security is for your EC2 Instances. Here, you can create a firewall called a security group. The default configuration of a security group blocks all inbound traffic and allows all outbound traffic.
+
+![27](snippets/imgs/27.jpg)
+
+You might be wondering, “Wouldn’t this block all EC2 instances from receiving the response of any customer requests?” Well, security groups are stateful. That means that they will remember if a connection is originally initiated by the EC2 instance or from the outside, and temporarily allow traffic to respond without modifying the inbound rules.
+
+If you want your EC2 instance to accept traffic from the internet, you must open up inbound ports. If you have a web server, you might need to accept HTTP and HTTPS requests to allow that type of traffic into your security group. You can create an inbound rule that will allow port 80 (HTTP) and port 443 (HTTPS), as shown.
+
+
+<table style="width:100%;"><thead><tr><th colspan="4" style="width:0%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Inbound rules</span></th></tr></thead><tbody><tr><td style="text-align:center;width:23.1727%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Type</span></strong></td><td style="text-align:center;width:24.0925%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Protocol</span></strong></td><td style="text-align:center;width:30.5724%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Port Range</span></strong></td><td style="width:21.8996%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Source</span></strong></td></tr><tr><td style="text-align:center;width:23.1727%;">HTTP (80)&nbsp;</td><td style="text-align:center;width:24.0925%;">TCP (6)</td><td style="text-align:center;width:30.5724%;">80</td><td style="width:21.8996%;">0.0.0.0/0<br></td></tr><tr><td style="text-align:center;width:23.1727%;">HTTP (80)</td><td style="text-align:center;width:24.0925%;">TCP (6)<br></td><td style="text-align:center;width:30.5724%;">80<br></td><td style="width:21.8996%;">::/0<br></td></tr><tr><td style="text-align:center;width:23.1727%;">HTTPS (443)</td><td style="text-align:center;width:24.0925%;">TCP (6)</td><td style="text-align:center;width:30.5724%;">443</td><td style="width:21.8996%;">0.0.0.0/0</td></tr><tr><td style="text-align:center;width:23.1727%;">HTTPS (443)<br></td><td style="text-align:center;width:24.0925%;">TCP (6)<br></td><td style="text-align:center;width:30.5724%;">443</td><td style="width:21.8996%;">::/0<br></td></tr></tbody></table>
+
+You learned in a previous unit that subnets can be used to segregate traffic between computers in your network. Security groups can be used in the same way. A common design pattern is to organize resources into different groups and create security groups for each to control network communication between them.
+
+
+![28](snippets/imgs/28.jpg)
+
+This example defines three tiers and isolates each tier with defined security group rules. In this case, internet traffic to the Web Tier is allowed over HTTPS, Web Tier to Application Tier traffic is allowed over HTTP, and Application tier to Database tier traffic is allowed over MySQL. This is different from traditional on-premises environments, in which you isolate groups of resources via a VLAN configuration. In AWS, security groups allow you to achieve the same isolation without tying it to your network.
+
+
+# Storage
+
+## Types
+
+AWS storage services are grouped into three categories
+
+- block storage
+- file storage
+- object storage.
+
+### File Storage
+
+You might be familiar with file storage if you have interacted with file storage systems like Windows File Explorer or Finder on macOS. Files are organized in a tree-like hierarchy that consists of folders and subfolders. For example, if you have hundreds of cat photos on your laptop, you might want to create a folder called Cat photos, and place the images inside that folder to organize them. Since you know these images will be used in an application, you might want to place the Cat photos folder inside another folder called Application files.
+
+![29](snippets/imgs/29.jpg)
+
+Each file has metadata such as file name, file size, and the date the file was created. The file also has a path, for example, computer/Application_files/Cat_photos/cats-03.png. When you need to retrieve a file, your system can use the path to find it in the file hierarchy.
+
+File storage is ideal when you require centralized access to files that need to be easily shared and managed by multiple host computers. Typically, this storage is mounted onto multiple hosts, and requires file locking and integration with existing file system communication protocols.
+
+Common use cases for file storage include:
+
+- Large content repositories
+- Development environments
+- User home directories
+
+
+### Block storage
+
+While file storage treats files as a singular unit, block storage splits files into fixed-size chunks of data called blocks that have their own addresses. Since each block is addressable, blocks can be retrieved efficiently.
+
+When data is requested, the addresses are used by the storage system to organize the blocks in the correct order to form a complete file to present back to the requestor. Outside of the address, no additional metadata is associated with each block. So, when you want to change a character in a file, you just change the block, or the piece of the file, that contains the character. This ease of access is why block storage solutions are fast and use less bandwidth.
+
+![30](snippets/imgs/30.jpg)
+
+
+Since block storage is optimized for low-latency operations, it is a typical storage choice for high-performance enterprise workloads, such as databases or enterprise resource planning (ERP) systems, that require low-latency storage.
+
+### Object storage
+
+Objects, much like files, are treated as a single unit of data when stored. However, unlike file storage, these objects are stored in a flat structure instead of a hierarchy. Each object is a file with a unique identifier. This identifier, along with any additional metadata, is bundled with the data and stored.
+
+Changing just one character in an object is more difficult than with block storage. When you want to change one character in a file, the entire file must be updated.
+
+![31](snippets/imgs/31.jpg)
+
+With object storage, you can store almost any type of data, and there is no limit to the number of objects stored, which makes it readily scalable. Object storage is generally useful when storing large datasets; unstructured files, like media assets; and static assets, like photos.
+
+
+
+### Relate back to traditional storage systems
+
+f you have worked with on-premises storage, you might already be familiar with block, file, and object storage. Consider the following technologies and how they relate to systems you might have seen before:
+
+- Block storage in the cloud is analogous to direct-attached storage (DAS) or a storage area network (SAN).
+- File storage systems are often supported with a network attached storage (NAS) server.
+
+
+Adding storage in a traditional data center is a rigid process – the storage solutions must be purchased, installed, and configured. With cloud computing, the process is more flexible. You can create, delete, and modify storage solutions within a matter of minutes.
+
+
+
+## EC2 instance store and Block Storage
+Amazon EC2 instance store provides temporary block-level storage for an instance. This storage is located on disks that are physically attached to the host computer. This ties the lifecycle of the data to the lifecycle of the EC2 instance. If you delete the instance, the instance store is deleted, as well. Due to this, instance store is considered ephemeral storage. Read more about it in the AWS documentation.
+
+Instance store is ideal if you host applications that replicate data to other EC2 instances, such as Hadoop clusters. For these cluster-based workloads, having the speed of locally attached volumes and the resiliency of replicated data helps you achieve data distribution at high performance. It’s also ideal for temporary storage of information that changes frequently, such as buffers, caches, scratch data, and other temporary content.
+
+### Amazon Elastic Block Storage (Amazon EBS)
+
+As the name implies, Amazon EBS is a block-level storage device that you can attach to an Amazon EC2 instance. These storage devices are called Amazon EBS volumes. EBS volumes are essentially drives of a user-configured size attached to an EC2 instance, similar to how you might attach an external drive to your laptop. EBS volumes act similarly to external drives in more than one way.
+
+- Most Amazon EBS volumes can only be connected with one computer at a time. Most EBS volumes have a one-to-one relationship with EC2 instances, so they cannot be shared by or attached to multiple instances at one time. (Recently, AWS announced the Amazon EBS multi-attach feature that enables volumes to be attached to multiple EC2 instances at one time. This feature is not available for all instance types, and all instances must be in the same Availability Zone. Read more about this scenario in the EBS documentation.)
+- You can detach an EBS volume from one EC2 instance and attach it to another EC2 instance in the same Availability Zone, to access the data on it.
+- The external drive is separate from the computer. That means, if an accident occurs and the computer goes down, you still have your data on your external drive. The same is true for EBS volumes.
+- You’re limited to the size of the external drive, since it has a fixed limit to how scalable it can be. For example, you might have a 2-TB external drive, which means you can only have 2 TB of content on it. This relates to EBS as well, since a volume also has a max limitation of how much content you can store on it.
+
+
+### Scale Amazon EBS volumes
+
+You can scale Amazon EBS volumes in two ways.
+
+- Increase the volume size, as long as it doesn’t increase above the maximum size limit. For EBS volumes, the maximum amount of storage you can have is 16 TB. If you provision a 5-TB EBS volume, you can choose to increase the size of your volume until you get to 16 TB.
+- Attach multiple volumes to a single Amazon EC2 instance. EC2 has a one-to-many relationship with EBS volumes. You can add these additional volumes during or after EC2 instance creation to provide more storage capacity for your hosts.
+
+### Amazon EBS use cases
+
+Amazon EBS is useful when you must retrieve data quickly and have data persist long-term. Volumes are commonly used in the following scenarios.
+
+- Operating systems: Boot/root volumes to store an operating system. The root device for an instance launched from an Amazon Machine Image (AMI) is typically an Amazon EBS volume. These are commonly referred to as EBS-backed AMIs.
+- Databases: A storage layer for databases running on Amazon EC2 that rely on transactional reads and writes.
+- Enterprise applications: Amazon EBS provides reliable block storage to run business-critical applications.
+- Throughput-intensive applications: Applications that perform long, continuous reads and writes.
+
+### Amazon EBS volume types
+
+Amazon EBS volumes are organized into two main categories – solid-state drives (SSDs) and hard-disk drives (HDDs). SSDs provide strong performance for random input/output (I/O), while HDDs provide strong performance for sequential I/O. AWS offers two types of each.
+
+The following chart can help you decide which EBS volume is the right option for your workload.
+
+<table style="width:100%;"><thead><tr><th style="width:15.0912%;background-color:rgb(0, 82, 118);text-align:left;"><span style="color:rgb(255, 255, 255);font-weight:bold;">Volume Types</span></th><th style="width:27.7472%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Description</span></th><th style="width:22.4499%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Use Cases</span></th><th style="width:11.3215%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Volume Size</span></th><th style="width:8.8248%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Max IOPS</span></th><th style="width:12.6354%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);">Max Throughput</span><br></th></tr></thead><tbody><tr><td style="text-align:left;width:15.0912%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">EBS Provisioned IOPS SSD</span>&nbsp;</strong></td><td style="text-align:center;width:27.7472%;">Highest performance SSD designed for latency-sensitive transactional workloads&nbsp;</td><td style="text-align:center;width:22.4499%;">I/O-intensive NoSQL and relational databases&nbsp;</td><td style="text-align:center;width:11.3215%;">4 GB–<br>16 TB</td><td style="text-align:center;width:8.8248%;">64,000</td><td style="width:12.6354%;">1,000 MB/s<br></td></tr><tr><td style="text-align:left;width:15.0912%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">EBS General Purpose SSD</span>&nbsp;</strong></td><td style="text-align:center;width:27.7472%;">General purpose SSD that balances price and performance for a wide variety of transactional workloads&nbsp;</td><td style="text-align:center;width:22.4499%;">Boot volumes, low-latency interactive apps, development, and test&nbsp;</td><td style="text-align:center;width:11.3215%;">1 GB–16 TB</td><td style="text-align:center;width:8.8248%;">16,000</td><td style="width:12.6354%;">250 MB/s<br></td></tr><tr><td style="text-align:left;width:15.0912%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Throughput Optimized HDD</span></strong><br></td><td style="text-align:center;width:27.7472%;">Low-cost HDD designed for frequently accessed, throughput-intensive workloads<br></td><td style="text-align:center;width:22.4499%;">Big data, data warehouses, log processing<br></td><td style="text-align:center;width:11.3215%;">500 GB–<br>16 TB<br></td><td style="text-align:center;width:8.8248%;">500<br></td><td style="width:12.6354%;">500 MB/s<br></td></tr><tr><td style="text-align:left;width:15.0912%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Cold HDD</span></strong><br></td><td style="text-align:center;width:27.7472%;">Lowest cost HDD designed for less frequently accessed workloads<br></td><td style="text-align:center;width:22.4499%;">Colder data requiring fewer scans per day<br></td><td style="text-align:center;width:11.3215%;">500 GB–<br>16 TB<br></td><td style="text-align:center;width:8.8248%;">250<br></td><td style="width:12.6354%;">250 MB/s<br></td></tr></tbody></table>
+
+### Amazon EBS benefits
+Here are the benefits of using Amazon EBS.
+
+- High availability: When you create an EBS volume, it is automatically replicated in its Availability Zone to prevent data loss from single points of failure.
+- Data persistence: The storage persists even when your instance doesn’t.
+- Data encryption: All EBS volumes support encryption.
+- Flexibility: EBS volumes support on-the-fly changes. You can modify volume type, volume size, and input/output operations per second (IOPS) capacity without stopping your instance.
+- Backups: Amazon EBS provides the ability to create backups of any EBS volume.
+
+### Amazon EBS snapshots
+
+Errors happen. One error is not backing up data and then inevitably losing it. To prevent this from happening to you, always back up your data – even in AWS.
+
+Since your EBS volumes consist of the data from your Amazon EC2 instance, you should make backups of these volumes, called snapshots.
+
+EBS snapshots are incremental backups that only save the blocks on the volume that have changed after your most recent snapshot. For example, if you have 10 GB of data on a volume, and only 2 GB of data have been modified since your last snapshot, only the 2 GB that have been changed are written to Amazon Simple Storage Service (Amazon S3).
+
+When you take a snapshot of any of your EBS volumes, the backups are stored redundantly in multiple Availability Zones using Amazon S3. This aspect of storing the backup in Amazon S3 is handled by AWS, so you won’t need to interact with Amazon S3 to work with your EBS snapshots. You manage them in the Amazon EBS console, which is part of the Amazon EC2 console.
+
+EBS snapshots can be used to create multiple new volumes, whether they’re in the same Availability Zone or a different one. When you create a new volume from a snapshot, it’s an exact copy of the original volume at the time the snapshot was taken.
+
+## Amazon S3
+
+Unlike Amazon Elastic Block Store (Amazon EBS), Amazon Simple Storage Service (Amazon S3) is a standalone storage solution that isn’t tied to compute. It enables you to retrieve your data from anywhere on the web. If you have used an online storage service to back up the data from your local machine, then you most likely have used a service similar to Amazon S3. The big difference between those online storage services and Amazon S3 is the storage type.
+
+Amazon S3 is an object storage service. Object storage stores data in a flat structure, using unique identifiers to look up objects when requested. An object is  a file combined with metadata. You can store as many of these objects as you’d like. All of the characteristics of object storage are also characteristics of Amazon S3.
+
+### Amazon S3 concepts
+In Amazon S3, you store your objects in containers called buckets. You can’t upload any object, not even a single photo, to Amazon S3 without creating a bucket first. When you create a bucket, you specify, at the very minimum, two details – the AWS Region you want the bucket to reside in and the bucket name.
+
+![32](snippets/imgs/32.jpg)
+
+To choose a Region, you will typically select a Region that you have used for other resources, such as your compute. When you choose a Region for your bucket, all objects you put inside the bucket will be redundantly stored across multiple devices, across multiple Availability Zones. This level of redundancy is designed to provide Amazon S3 customers with 99.999999999% durability and 99.99% availability for objects over a given year.
+
+When you choose a bucket name, it must be unique across all AWS accounts. AWS stops you from choosing a bucket name that has already been chosen by someone else in another AWS account. Once you choose a name, that name is yours and cannot be claimed by anyone else unless you delete the bucket, which then releases the name for others to use.
+
+AWS uses the bucket name as part of the object identifier. In S3, each object is identified using a URL, as shown.
+
+![33](snippets/imgs/33.jpg)
+
+
+After the http://, you can see the bucket name. In this example, the bucket is named doc. Then, the identifier uses the s3 service name and the service provider, amazonaws. After that, you have an implied folder inside the bucket called 2006-03-01 and the object inside the folder that is named AmazonS3.html. The object name is often referred to as the key name.
+
+You can have folders inside of buckets to help you organize objects. However, remember that no actual file hierarchy supports this on the backend. It is instead a flat structure where all files and folders live at the same level. Using buckets and folders implies a hierarchy, which creates an understandable organization for users.
+
+### Amazon S3 use cases
+
+Amazon S3 is a widely used storage service, with far more use cases than could fit on one screen. The following list summarizes some of the most common ways you can use Amazon S3:
+
+- Backup and storage: Amazon S3 is a natural place to back up files because it is highly redundant. As mentioned in the last unit, AWS stores your EBS snapshots in S3 to take advantage of its high availability.
+- Media hosting: Because you can store unlimited objects, and each individual object can be up to 5 TBs, Amazon S3 is an ideal location to host video, photo, and music uploads.
+- Software delivery: You can use Amazon S3 to host your software applications that customers can download.
+- Data lakes: Amazon S3 is an optimal foundation for a data lake because of its virtually unlimited scalability. You can increase storage from gigabytes to petabytes of content, paying only for what you use.
+- Static websites: You can configure your S3 bucket to host a static website of HTML, CSS, and client-side scripts.
+- Static content: Because of the limitless scaling, the support for large files, and the fact that you access any object over the web at any time, Amazon S3 is the perfect place to store static content.
+
+### Choose the right connectivity option for resources
+
+
+Everything in Amazon S3 is private by default. This means that all S3 resources, such as buckets, folders, and objects can only be viewed by the user or AWS account that created that resource. Amazon S3 resources are all private and protected to begin with.
+
+If you decide that you want everyone on the internet to see your photos, you can choose to make your buckets, folders, and objects public. A public resource means that everyone on the internet can see it. Most of the time, you don’t want your permissions to be all or nothing. Typically, you want to be more granular about the way you provide access to your resources.
+
+![34](snippets/imgs/34.png)
+
+To be more specific about who can do what with your Amazon S3 resources, Amazon S3 provides two main access management features – IAM policies and S3 bucket policies.
+
+
+
+### IAM policies
+
+
+
+Previously, you learned about creating and using IAM policies. Now, you can apply that knowledge to Amazon S3. When IAM policies are attached to IAM users, groups, and roles, the policies define which actions they can perform. IAM policies are not tied to any one AWS service and can be used to define access to nearly any AWS action. 
+
+You should use IAM policies for private buckets in the following two scenarios:
+
+- You have many buckets with different permission requirements. Instead of defining many different S3 bucket policies, you can use IAM policies.
+- You want all policies to be in a centralized location. Using IAM policies allows you to manage all policy information in one location.
+
+
+### S3 bucket policies
+
+Like IAM policies, Amazon S3 bucket policies are defined in a JSON format. The difference is IAM policies are attached to users, groups, and roles, whereas S3 bucket policies are only attached to S3 buckets. S3 bucket policies specify what actions are allowed or denied on the bucket.
+
+For example, if you have a bucket called employeebucket, you can attach an S3 bucket policy to it that allows another AWS account to put objects in that bucket.
+
+Or if you wanted to allow anonymous viewers to read the objects in employeebucket, then you can apply a policy to that bucket that allows anyone to read objects in the bucket using "Effect":Allow on the "Action:["s3:GetObject"]".
+
+Here’s an example of what the S3 bucket policy might look like.
+
+```js
+{
+"Version":"2012-10-17",
+"Statement":[{
+"Sid":"PublicRead",
+"Effect":"Allow",
+"Principal": "*",
+"Action":["s3:GetObject"],
+"Resource":["arn:aws:s3:::employeebucket/*"]
+}]
+}
+```
+
+S3 bucket policies can only be placed on buckets, and cannot be used for folders or objects. However, the policy that is placed on the bucket applies to every object in that bucket.
+
+You should use S3 bucket policies in the following scenarios:
+
+- You need a simple way to do cross-account access to S3, without using IAM roles.
+- Your IAM policies bump up against the defined size limit. S3 bucket policies have a larger size limit.
+
+
+### Amazon S3 encryption
+
+Amazon S3 reinforces encryption in transit (as it travels to and from Amazon S3) and at rest. To protect data at rest, you can use encryption, as follows:
+
+- Server-side encryption: This allows Amazon S3 to encrypt your object before saving it on disks in its data centers and then decrypt it when you download the objects.
+- Client-side encryption: You can encrypt your data client-side and then upload the encrypted data to Amazon S3. In this case, you manage the encryption process, the encryption keys, and all related tools.
+
+To encrypt in transit, you can use client-side encryption or Secure Sockets Layer (SSL).
+
+
+### Amazon S3 versioning
+
+As described earlier, Amazon S3 identifies objects in part by using the object name. For example, when you upload an employee photo to Amazon S3, you might name the object employee.jpg and store it in a folder called employees. If you don’t use Amazon S3 versioning, every time you upload an object called employee.jpg to the employees folder, it will overwrite the original file.
+This can be an issue for several reasons, including the following:
+
+- The employee.jpg file name is a common name for an employee photo object. You or someone else who has access to the bucket might not have intended to overwrite it, but once it's overwritten, the original file can't be accessed.
+- You might want to preserve different versions of employee.jpg. Without versioning, if you wanted to create a new version of employee.jpg, you would need to upload the object and choose a different name for it. Having several objects all with slight differences in naming variations can cause confusion and clutter in S3 buckets.
+
+To counteract these issues, you can use S3 versioning. Versioning keeps multiple versions of a single object in the same bucket. This preserves old versions of an object without using different names, which helps with file recovery from accidental deletions, accidental overwrites, or  application failures.
+
+![35](snippets/imgs/35.png)
+
+
+If you enable versioning for a bucket, Amazon S3 automatically generates a unique version ID for the object. In one bucket, for example, you can have two objects with the same key, but different version IDs, such as employeephoto.gif (version 111111) and employeephoto.gif (version 121212).
+
+Versioning-enabled buckets let you recover objects from accidental deletion or overwrite.
+
+- Deleting an object does not remove the object permanently. Instead, Amazon S3 puts a marker on the object that shows you tried to delete it. If you want to restore the object, you can remove the marker, and it reinstates the object.
+- If you overwrite an object, it results in a new object version in the bucket. You still have access to previous versions of the object.
+
+### Versioning states
+
+Buckets can be in one of the following three states:
+
+- Unversioned (default): No new and existing objects in the bucket have a version.
+- Versioning-enabled: Versioning is enabled for all objects in the bucket.
+- Versioning-suspended: Versioning is suspended for new objects. All new objects in the bucket will not have a version However, all existing objects keep their object versions.
+
+The versioning state applies to all objects in the bucket. Storage costs are incurred for all objects in your bucket, including all versions. To reduce your Amazon S3 bill, you might want to delete previous versions of your objects once they are no longer needed.
+
+### Six Amazon S3 storage classes
+
+When you upload an object to Amazon S3 and you don’t specify the storage class, you upload it to the default storage class – often referred to as standard storage. In previous lessons, you learned about the Amazon S3 standard storage class without even knowing it!
+
+Amazon S3 storage classes let you change your storage tier when your data characteristics change. For example, if you are accessing your old photos infrequently, you might want to change the storage class for the photos to save costs.
+
+<table cellspacing="0" cellpadding="1"> 
+         <tbody> 
+          <tr> 
+           <th>&nbsp;</th> 
+           <th style="text-align: center;">S3 Standard</th> 
+           <th style="text-align: center;">S3 Intelligent-Tiering*<br> </th> 
+           <th style="text-align: center;">S3 Standard-IA<br> </th> 
+           <th style="text-align: center;">S3 One Zone-IA†<br> </th> 
+           <th style="text-align: center;">S3 Glacier <br> Instant Retrieval<br> </th> 
+           <th>S3 Glacier Flexible Retrieval</th> 
+           <th style="text-align: center;">S3 Glacier<br> Deep Archive<br> </th> 
+          </tr> 
+          <tr> 
+           <td>Designed for durability<br> </td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+           <td>99.999999999%<br> (11 9’s)</td> 
+           <td style="text-align: center;">99.999999999%<br> (11 9’s)</td> 
+          </tr> 
+          <tr> 
+           <td>Designed for availability<br> </td> 
+           <td style="text-align: center;">99.99%</td> 
+           <td style="text-align: center;">99.9%</td> 
+           <td style="text-align: center;">99.9%</td> 
+           <td style="text-align: center;">99.5%</td> 
+           <td style="text-align: center;">99.9%</td> 
+           <td>99.99%</td> 
+           <td style="text-align: center;">99.99%<br> </td> 
+          </tr> 
+          <tr> 
+           <td>Availability SLA</td> 
+           <td style="text-align: center;">99.9%</td> 
+           <td style="text-align: center;">99%</td> 
+           <td style="text-align: center;">99%</td> 
+           <td style="text-align: center;">99%</td> 
+           <td style="text-align: center;">99%<br> </td> 
+           <td>99.%</td> 
+           <td style="text-align: center;">99.9%<br> </td> 
+          </tr> 
+          <tr> 
+           <td>Availability Zones</td> 
+           <td style="text-align: center;">≥3</td> 
+           <td style="text-align: center;">≥3</td> 
+           <td style="text-align: center;">≥3</td> 
+           <td style="text-align: center;">1</td> 
+           <td style="text-align: center;">≥3</td> 
+           <td>≥3</td> 
+           <td style="text-align: center;">≥3</td> 
+          </tr> 
+          <tr> 
+           <td>Minimum capacity charge per object</td> 
+           <td style="text-align: center;">N/A</td> 
+           <td style="text-align: center;">N/A</td> 
+           <td style="text-align: center;">128 KB</td> 
+           <td style="text-align: center;">128 KB</td> 
+           <td style="text-align: center;">128 KB</td> 
+           <td>40 KB</td> 
+           <td style="text-align: center;">40 KB</td> 
+          </tr> 
+          <tr> 
+           <td>Minimum storage duration charge</td> 
+           <td style="text-align: center;">N/A</td> 
+           <td style="text-align: center;">N/A</td> 
+           <td style="text-align: center;">30 days</td> 
+           <td style="text-align: center;">30 days</td> 
+           <td style="text-align: center;">90 days</td> 
+           <td>90 days</td> 
+           <td style="text-align: center;">180 days</td> 
+          </tr> 
+          <tr> 
+           <td>Retrieval charge</td> 
+           <td style="text-align: center;">N/A<br> </td> 
+           <td style="text-align: center;">N/A<br> </td> 
+           <td style="text-align: center;">per GB retrieved<br> </td> 
+           <td style="text-align: center;">per GB retrieved</td> 
+           <td style="text-align: center;">per GB retrieved</td> 
+           <td>per GB retrieved</td> 
+           <td style="text-align: center;">per GB retrieved</td> 
+          </tr> 
+          <tr> 
+           <td>First byte latency</td> 
+           <td style="text-align: center;">milliseconds</td> 
+           <td style="text-align: center;">milliseconds</td> 
+           <td style="text-align: center;">milliseconds</td> 
+           <td style="text-align: center;">milliseconds</td> 
+           <td style="text-align: center;">milliseconds</td> 
+           <td>minutes or hours</td> 
+           <td style="text-align: center;">hours</td> 
+          </tr> 
+          <tr> 
+           <td>Storage type</td> 
+           <td style="text-align: center;">Object</td> 
+           <td style="text-align: center;">Object</td> 
+           <td style="text-align: center;">Object</td> 
+           <td style="text-align: center;">Object</td> 
+           <td style="text-align: center;">Object</td> 
+           <td>Object</td> 
+           <td style="text-align: center;">Object</td> 
+          </tr> 
+          <tr> 
+           <td>Lifecycle transitions</td> 
+           <td style="text-align: center;">Yes</td> 
+           <td style="text-align: center;">Yes</td> 
+           <td style="text-align: center;">Yes</td> 
+           <td style="text-align: center;">Yes</td> 
+           <td style="text-align: center;">Yes</td> 
+           <td>Yes</td> 
+           <td style="text-align: center;">Yes</td> 
+          </tr> 
+         </tbody> 
+        </table>
+
+
+
+### Automate tier transitions with object lifecycle management
+
+If you keep manually changing your objects, such as your employee photos, from storage tier to storage tier, you might want to automate the process with a lifecycle policy. When you define a lifecycle policy configuration for an object or group of objects, you can choose to automate two actions – transition and expiration actions.
+
+- Transition actions define when objects should transition to another storage class.
+- Expiration actions define when objects expire and should be permanently deleted.
+For example, you might transition objects to S3 Standard-IA storage class 30 days after you create them, or archive objects to the S3 Glacier storage class one year after creating them.
+
+
+![36](snippets/imgs/36.jpg)
+
+
+The following use cases are good candidates for lifecycle management:
+
+- Periodic logs: If you upload periodic logs to a bucket, your application might need them for a week or a month. After that, you might want to delete them.
+- Data that changes in access frequency: Some documents are frequently accessed for a limited period of time. After that, they are infrequently accessed. At some point, you might not need real-time access to them, but your organization or regulations might require you to archive them for a specific period. After that, you can delete them.
+
+## Choose the Right Storage Service
+
+Here’s a recap of all the storage services mentioned so far. By the end of this reading, you should be able to better answer the question, “Which storage service should I use?” for some of the more common scenarios.
+
+### Amazon EC2 instance store
+Instance store is ephemeral block storage. This is preconfigured storage that exists on the same physical server that hosts the EC2 instance and cannot be detached from Amazon EC2. You can think of it as a built-in drive for your EC2 instance. 
+
+Instance store is generally well-suited for temporary storage of information that is constantly changing, such as buffers, caches, and scratch data. It is not meant for data that is persistent or long-lasting. If you need persistent long-term block storage that can be detached from Amazon EC2 and provide you more management flexibility, such as increasing volume size or creating snapshots, then you should use Amazon EBS.
+
+
+### Amazon EBS
+
+Amazon EBS is meant for data that changes frequently and needs to persist through instance stops, terminations, or hardware failures. Amazon EBS has two types of volumes – SSD-backed volumes and HDD-backed volumes.
+
+SSD-backed volumes have the following characteristics:
+
+- Performance depends on IOPS (input/output operations per second).
+- Ideal for transactional workloads, such as databases and boot volumes.
+HDD-backed volumes have the following characteristics:
+
+- Performance depends on MB/s.
+- Ideal for throughput-intensive workloads, such as big data, data warehouses, log processing, and sequential data I/O.
+Here are a few important features of Amazon EBS that you need to know when comparing it to other services.
+
+- It is block storage.
+- You pay for what you provision (you have to provision storage in advance).
+- EBS volumes are replicated across multiple servers in a single Availability Zone.
+- Most EBS volumes can only be attached to a single EC2 instance at a time.
+
+
+### Amazon S3
+
+If your data doesn’t change that often, Amazon S3 might be a cost-effective and scalable storage solution for you. Amazon S3 is ideal for storing static web content and media, backups and archiving, and data for analytics. It can also host entire static websites with custom domain names.
+
+Here are a few important features of Amazon S3 to know about when comparing it to other services:
+
+- It is object storage.
+- You pay for what you use (you don’t have to provision storage in advance).
+- Amazon S3 replicates your objects across multiple Availability Zones in a Region.
+- Amazon S3 is not storage attached to compute.
+
+
+### Amazon Elastic File System (Amazon EFS) and Amazon FSx
+
+In this module, you’ve already learned about Amazon S3 and Amazon EBS. You learned that S3 uses a flat namespace and isn’t meant to serve as a standalone file system. You also learned most EBS volumes can only be attached to one EC2 instance at a time. So, if you need file storage on AWS, which service should you use?
+
+For file storage that can mount on to multiple EC2 instances, you can use Amazon Elastic File System (Amazon EFS) or Amazon FSx. The following table provides more information about each service.
+
+<table style="width:100%;"><thead><tr><th style="width:33.0938%;background-color:rgb(0, 82, 118);text-align:center;"><span style="color:rgb(255, 255, 255);font-weight:bold;">Service&nbsp;</span></th><th style="width:41.241%;background-color:rgb(0, 82, 118);text-align:center;"><span style="color:rgb(255, 255, 255);font-weight:bold;">Description</span></th><th style="width:25.6447%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">FAQs</span><br></th></tr></thead><tbody><tr><td style="text-align:left;width:33.0938%;"><span><strong>Amazon Elastic File System (Amazon EFS)</strong></span></td><td style="text-align:left;width:41.241%;"><span>Fully managed NFS file system</span></td><td style="text-align:center;width:25.6447%;"><a href="https://aws.amazon.com/efs/faq/" rel="noopener noreferrer" target="_blank" tabindex="0" aria-hidden="false"><span>EFS FAQs</span></a></td></tr><tr><td style="text-align:left;width:33.0938%;"><span><strong>Amazon FSx for Windows File Server</strong>&nbsp;</span></td><td style="text-align:left;width:41.241%;"><span>Fully managed file server built on Windows Server that supports the SMB protocol</span></td><td style="text-align:center;width:25.6447%;"><a href="https://aws.amazon.com/fsx/windows/faqs/?nc=sn&amp;loc=8" rel="noopener noreferrer" target="_blank" tabindex="0" aria-hidden="false"><span>FSx for Windows File Server FAQs</span></a></td></tr><tr><td style="text-align:left;width:33.0938%;"><strong>Amazon FSx for Lustre</strong><br></td><td style="text-align:left;width:41.241%;">Fully managed Lustre file system that integrates with S3<br></td><td style="text-align:center;width:25.6447%;"><a href="https://aws.amazon.com/fsx/lustre/faqs/?nc=sn&amp;loc=5" rel="noopener noreferrer" target="_blank" tabindex="0" aria-hidden="false">FSx for Lustre FAQs</a><br></td></tr></tbody></table>
+
+
+Here are a few important features of Amazon EFS and Amazon FSx to know about when comparing them to other services:
+
+- It is file storage.
+- You pay for what you use (you don’t have to provision storage in advance).
+- Amazon EFS and Amazon FSx can be mounted onto multiple EC2 instances.
 
 # Subtleties
 
