@@ -129,6 +129,34 @@
     - [Amazon EBS](#amazon-ebs)
     - [Amazon S3](#amazon-s3-1)
     - [Amazon Elastic File System (Amazon EFS) and Amazon FSx](#amazon-elastic-file-system-amazon-efs-and-amazon-fsx)
+- [Databases on AWS](#databases-on-aws)
+  - [History behind enterprise databases](#history-behind-enterprise-databases)
+  - [Relational databases](#relational-databases)
+  - [Relational database management system](#relational-database-management-system)
+  - [Relational database benefits](#relational-database-benefits)
+  - [Relational database use cases](#relational-database-use-cases)
+  - [Choose between unmanaged and managed databases](#choose-between-unmanaged-and-managed-databases)
+    - [On-premises database](#on-premises-database)
+    - [Unmanaged database](#unmanaged-database)
+    - [Managed database](#managed-database)
+  - [Amazon Relational Database Service](#amazon-relational-database-service)
+    - [Amazon RDS](#amazon-rds)
+    - [DB instances](#db-instances)
+    - [Amazon RDS in an Amazon Virtual Private Cloud](#amazon-rds-in-an-amazon-virtual-private-cloud)
+    - [Secure Amazon RDS with AWS Identity and Access Management (IAM)](#secure-amazon-rds-with-aws-identity-and-access-management-iam)
+      - [Backup data](#backup-data)
+      - [Automatic backups](#automatic-backups)
+      - [Manual snapshots](#manual-snapshots)
+    - [Backup options](#backup-options)
+    - [Redundancy with Amazon RDS Multi-AZ](#redundancy-with-amazon-rds-multi-az)
+  - [Purpose built databases](#purpose-built-databases)
+  - [Amazon DynamoDB](#amazon-dynamodb)
+    - [Amazon DynamoDB introduction](#amazon-dynamodb-introduction)
+    - [Amazon DynamoDB core components](#amazon-dynamodb-core-components)
+    - [Amazon DynamoDB security](#amazon-dynamodb-security)
+  - [Choose the Right Database Service](#choose-the-right-database-service)
+    - [AWS database services](#aws-database-services)
+    - [Breaking up applications and databases](#breaking-up-applications-and-databases)
 - [Subtleties](#subtleties)
   - [IAM User vs IAM Role](#iam-user-vs-iam-role)
 
@@ -1403,6 +1431,218 @@ Here are a few important features of Amazon EFS and Amazon FSx to know about whe
 - It is file storage.
 - You pay for what you use (you don’t have to provision storage in advance).
 - Amazon EFS and Amazon FSx can be mounted onto multiple EC2 instances.
+
+# Databases on AWS
+
+## History behind enterprise databases
+
+Choosing a database used to be a straightforward decision. Customers had only a few options to choose among. Typically, they would consider a few vendors and then inevitably chose one for all their applications. Businesses often selected a database technology before they fully understood their use case. Since the 1970s, the database type most commonly selected by businesses was a relational database.
+
+## Relational databases
+
+A relational database organizes data into tables. Data in one table can be linked to data in other tables to create relationships – hence, the relational part of the name.
+
+A table stores data in rows and columns. A row, often called a record, contains all information about a specific entry. Columns describe attributes of an entry. Here’s an example of three tables in a relational database.
+
+![38](snippets/imgs/37.png)
+
+## Relational database management system
+
+A relational database management system (RDBMS) lets you create, update, and administer a relational database. Here are some common examples of relational database management systems:
+
+- MySQL
+- PostgresQL
+- Oracle
+- SQL server
+- Amazon Aurora
+
+
+You communicate with an RDBMS by using Structured Query Language (SQL) queries, similar to the following example:
+
+```
+SELECT * FROM table_name
+```
+
+This query selects all the data from a particular table. However, the real power of SQL queries is in creating more complex queries that help you pull data from several tables to piece together patterns and answers to business problems. For example, querying the sales table and the book table together to see sales in relation to an author’s books. This is made possible by a join.
+
+## Relational database benefits
+
+Relational database offer a number of benefits, including the following:
+
+- **Joins**: You can join tables, enabling you to better understand relationships between your data.
+- **Reduced** redundancy: You can store data in one table and reference it from other tables instead of saving the same data in different places.
+- **Familiarity**: Relational databases have been a popular choice since the 1970s. Due to this popularity, technical professionals often have familiarity and experience with this type of database.
+- **Accuracy**: Relational databases ensure that your data is persisted with high integrity and adheres to the atomicity, consistency, isolation, durability (ACID) principle.
+
+## Relational database use cases
+
+Much of the world runs on relational databases. In fact, they’re at the core of many mission-critical applications, some of which you might use in your day-to-day life. Here are some common use cases for relational databases.
+
+- Applications that have a solid schema that doesn’t change often, such as lift-and-shift applications that lift an app from on-premises and shifts it to the cloud, with little or no modifications.
+- Applications that need persistent storage that follow the ACID principle, such as:
+- Enterprise resource planning (ERP) applications
+- Customer relationship management (CRM) applications
+- Commerce and financial applications
+
+## Choose between unmanaged and managed databases
+If you want to run a relational database on AWS, you first need to select how you want to run it – managed or unmanaged. The paradigm of managed versus unmanaged services is similar to the shared responsibility model. The shared responsibility model distinguishes between AWS security responsibilities and the customer’s security responsibilities. Similarly, managed versus unmanaged can be understood as a tradeoff between convenience and control.
+
+
+### On-premises database
+
+If you operate a relational database on-premises (in your own data center), you are responsible for all aspects of operation, including the data center's security and electricity, the host machine's management, database management, query optimization, and customer data management. You are responsible for absolutely everything, which means you have control over absolutely everything.
+
+### Unmanaged database
+![38](snippets/imgs/38.png)
+
+Now, suppose you want to shift some of the work to AWS by running your relational database on Amazon EC2. If you host a database on Amazon EC2, AWS takes care of implementing and maintaining the physical infrastructure and hardware, and installing the operating system of the EC2 instance. However, you would still be responsible for managing the EC2 instance, managing the database on that host, optimizing queries, and managing customer data.
+
+This is referred to as an unmanaged database option. In this option, AWS is responsible for and has control over the hardware and underlying infrastructure, and you are responsible and have control over management of the host and database.
+
+### Managed database
+
+
+![39](snippets/imgs/39.jpg)
+To shift more of the work to AWS, you can use a managed database service. These services provide the setup of both the EC2 instance and the database, and they provide systems for high availability, scalability, patching, and backups. However, in this model, you’re still responsible for database tuning, query optimization, and of course, ensuring that your customer data is secure. This option provides the ultimate convenience but the least amount of control compared to the two previous options.
+
+## Amazon Relational Database Service
+
+### Amazon RDS
+
+Amazon Relational Database Service (Amazon RDS) lets customers create and manage relational databases in the cloud without the operational burden of traditional database management. For example, if you sell healthcare equipment and your goal is to be the number-one seller in the Pacific Northwest, building a database doesn’t directly help you achieve that goal, although having a database is necessary to achieve the goal.
+
+Amazon RDS offloads some of the unrelated work of creating and managing a database. You can focus on the tasks that differentiate your application, instead of focusing on infrastructure-related tasks, like provisioning, patching, scaling, and restoring.
+
+Amazon RDS supports most of the popular relational database management systems, ranging from commercial options, open source options, and even an AWS-specific option. The supported Amazon RDS engines are:
+
+- Commercial: Oracle, SQL Server
+- Open Source: MySQL, PostgreSQL, MariaDB
+- Cloud Native: Amazon Aurora
+
+![40](snippets/imgs/40.png)
+
+The cloud native option, Amazon Aurora, is a MySQL- and PostgreSQL-compatible database built for the cloud. It is more durable, more available, and provides faster performance than the Amazon RDS version of MySQL and PostgreSQL. To learn more about Amazon Aurora, view the Amazon Aurora FAQs.
+
+### DB instances
+
+Just like the databases that you build and manage yourself, Amazon RDS is built off of compute and storage. The compute portion is called the DB (database) instance, which runs the database engine. Depending on the engine of the DB instance you choose, the engine will have different supported features and configurations. A DB instance can contain multiple databases with the same engine, and each database can contain multiple tables.
+
+Underneath the DB instance is an EC2 instance. However, this instance is managed through the Amazon RDS console instead of the Amazon EC2 console. When you create your DB instance, you choose the instance type and size. Amazon RDS supports the following three instance families:
+
+- Standard, which includes general-purpose instances
+- Memory Optimized, which is optimized for memory-intensive applications
+- Burstable Performance, which provides a baseline performance level, with the ability to burst to full CPU usage
+
+![41](snippets/imgs/41.png)
+
+The DB instance you choose affects how much processing power and memory it has. The available options depend on the selected engine. You can find more information about DB instance types in the Resources section.
+
+Much like a regular EC2 instance, a DB instance uses Amazon Elastic Block Store (EBS) volumes as its storage layer. You can choose from the following Amazon EBS volume storage types:
+
+- General purpose (SSD)
+- Provisioned IOPS (SSD)
+- Magnetic storage (not recommended)
+
+
+![42](snippets/imgs/42.png)
+
+### Amazon RDS in an Amazon Virtual Private Cloud
+
+When you create a DB instance, you select the Amazon Virtual Private Cloud (VPC) that your databases will live in. Then, you select the subnets that you want the DB instances to be placed in. This is referred to as a DB subnet group. To create a DB subnet group, you specify the following:
+
+- Availability Zones (AZs) that include the subnets you want to add
+- Subnets in the AZ where your DB instances are placed
+The subnets you add should be private, so they don’t have a route to the internet gateway. This ensures that your DB instance, and the data inside of it, can only be reached by the app backend.
+
+Access to the DB instance can be further restricted by using network access control lists (network ACLs) and security groups. With these firewalls, you can control, at a granular level, the type of traffic you want to allow into your database.
+
+Using these controls provide layers of security for your infrastructure. It reinforces that only the backend instances have access to the database.
+
+### Secure Amazon RDS with AWS Identity and Access Management (IAM)
+
+Network ACLs and security groups help users dictate the flow of traffic. If you want to restrict the actions and resources others can access, you can use IAM policies. 
+
+#### Backup data
+
+You don’t want to lose you data. To take regular backups of your RDS instance, you can use:
+
+- Automatic backups
+- Manual snapshots
+
+#### Automatic backups
+
+Automated backups are turned on by default. This backs up your entire DB instance (not just individual databases on the instance) and your transaction logs. When you create your DB instance, you set a backup window that is the period of time that automatic backups occur. Typically, you want to set the windows during a time when your database experiences little activity, because it can cause increased latency and downtime.
+
+You can retain your automated backups between 0 and 35 days. You might ask yourself, “Why set automated backups for 0 days?” The 0 days setting actually disables automatic backups from happening. If you set it to 0, it will also delete all existing automated backups. This is not ideal. The benefit of having automated backups is to have the ability to do point-in-time recovery.
+
+![43](snippets/imgs/43.jpg)
+
+Point-in-time recovery creates a new DB instance using data restored from a specific point in time. This restoration method provides more granularity by restoring the full backup and rolling back transactions up to the specified time range.
+
+#### Manual snapshots
+If you want to keep your automated backups longer than 35 days, use manual snapshots. Manual snapshots are similar to taking Amazon EBS snapshots, except that you manage them in the Amazon RDS console. These are backups that you can initiate at any time. They exist until you delete them. For example, to meet a compliance requirement that mandates you to keep database backups for a year, you would need to use manual snapshots. If you restore data from a manual snapshot, it creates a new DB instance using the data from the snapshot.
+
+![44](snippets/imgs/44.jpg)
+
+
+### Backup options
+It is advisable to deploy both options. Automated backups are beneficial for point-in-time recovery. Manual snapshots allow you to retain backups for longer than 35 days. 
+
+### Redundancy with Amazon RDS Multi-AZ
+
+When you enable Amazon RDS Multi-AZ, Amazon RDS creates a redundant copy of your database in another AZ. You end up with two copies of your database – a primary copy in a subnet in one AZ and a standby copy in a subnet in a second AZ.
+
+The primary copy of your database provides access to your data so that applications can query and display the information. The data in the primary copy is synchronously replicated to the standby copy. The standby copy is not considered an active database, and it does not get queried by applications.
+
+To improve availability, Amazon RDS Multi-AZ ensures that you have two copies of your database running and that one of them is in the primary role. If an availability issue arises, such as the primary database loses connectivity, Amazon RDS triggers an automatic failover.
+
+When you create a DB instance, a Domain Name System (DNS) name is provided. AWS uses that DNS name to failover to the standby database. In an automatic failover, the standby database is promoted to the primary role, and queries are redirected to the new primary database.
+
+To ensure that you don’t lose Multi-AZ configuration, a new standby database is created by either:
+
+- Demoting the previous primary to standby if it’s still up and running
+- Standing up a new standby DB instance
+The reason you can select multiple subnets for an Amazon RDS database is because of the Multi-AZ configuration. You’ll want to ensure that you have used subnets in different AZs for your primary and standby copies.
+
+## Purpose built databases
+
+## Amazon DynamoDB
+
+### Amazon DynamoDB introduction 
+
+Amazon DynamoDB is a fully managed NoSQL database service that provides fast and predictable performance with seamless scalability. DynamoDB lets you offload the administrative burdens of operating and scaling a distributed database so that you don't have to worry about hardware provisioning, setup and configuration, replication, software patching, or cluster scaling.
+
+With DynamoDB, you can create database tables that can store and retrieve any amount of data and serve any level of request traffic. You can scale up or scale down your tables' throughput capacity without downtime or performance degradation. You can use the AWS Management Console to monitor resource usage and performance metrics.
+
+DynamoDB automatically spreads the data and traffic for your tables over a sufficient number of servers to handle your throughput and storage requirements, while maintaining consistent and fast performance. All of your data is stored on solid-state disks (SSDs) and is automatically replicated across multiple Availability Zones in an AWS Region, providing built-in high availability and data durability.
+
+### Amazon DynamoDB core components
+
+In DynamoDB, tables, items, and attributes are the core components that you work with. A table is a collection of items, and each item is a collection of attributes. DynamoDB uses primary keys to uniquely identify each item in a table and secondary indexes to provide more querying flexibility.
+
+The following are the basic DynamoDB components:
+
+- **Tables** – Similar to other database systems, DynamoDB stores data in tables. A table is a collection of data. For instance, you could have a table called People that you could use to store personal contact information about friends, family, or anyone else of interest. You could also have a Cars table to store information about vehicles that people drive.
+- **Items** – Each table contains zero or more items. An item is a group of attributes that is uniquely identifiable among all the other items. In a People table, each item represents a person. In a Cars table, each item represents one vehicle. Items in DynamoDB are similar in many ways to rows, records, or tuples in other database systems. In DynamoDB, there is no limit to the number of items you can store in a table.
+- **Attributes** – Each item is composed of one or more attributes. An attribute is a fundamental data element, something that does not need to be broken down any further. For example, an item in a People table might contain attributes called PersonID, LastName, FirstName, and so on. In a Department table, an item might have attributes such as DepartmentID, Name, Manager, and so on. Attributes in DynamoDB are similar in many ways to fields or columns in other database systems.
+
+### Amazon DynamoDB security
+
+DynamoDB also offers encryption at rest, which eliminates the operational burden and complexity involved in protecting sensitive data. For more information, see DynamoDB Encryption at Rest.
+
+## Choose the Right Database Service
+
+### AWS database services
+
+AWS has a variety of database options for different use cases. The following table provides a quick look at the AWS database portfolio. 
+
+<table style="width:100%;"><thead><tr><th style="width:17.7193%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Database Type&nbsp;</span></th><th style="width:41.3724%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">Use Cases</span></th><th style="width:40.8878%;background-color:rgb(0, 82, 118);"><span style="color:rgb(255, 255, 255);font-weight:bold;">AWS Service</span></th></tr></thead><tbody><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><strong><span style="color:rgb(255, 255, 255);">Relational</span></strong></td><td style="text-align:center;width:41.3724%;">Traditional applications, ERP, CRM, <br>e-commerce</td><td style="text-align:center;width:40.8878%;">Amazon RDS, Amazon Aurora, <br>Amazon Redshift </td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Key-value</strong></span></td><td style="text-align:center;width:41.3724%;">High-traffic web apps, e-commerce systems, gaming applications</td><td style="text-align:center;width:40.8878%;">Amazon DynamoDB</td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>In-memory</strong></span><br></td><td style="text-align:center;width:41.3724%;">Caching, session management, gaming leaderboards, geospatial applications<br></td><td style="text-align:center;width:40.8878%;">Amazon ElastiCache for Memcached, Amazon ElastiCache for Redis<br></td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Document</strong></span><br></td><td style="text-align:center;width:41.3724%;">Content management, catalogs, user profiles<br></td><td style="text-align:center;width:40.8878%;">Amazon DocumentDB (with MongoDB compatibility)<br></td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Wide column</strong></span><br></td><td style="text-align:center;width:41.3724%;">High-scale industrial apps for equipment maintenance, fleet management, and route optimization<br></td><td style="text-align:center;width:40.8878%;">Amazon Keyspaces (for Apache Cassandra)<br></td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Graph</strong></span><br></td><td style="text-align:center;width:41.3724%;">Fraud detection, social networking, recommendation engines<br></td><td style="text-align:center;width:40.8878%;">Amazon Neptune<br></td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Time series</strong></span><br></td><td style="text-align:center;width:41.3724%;">IoT applications, DevOps, industrial telemetry<br></td><td style="text-align:center;width:40.8878%;">Amazon Timestream<br></td></tr><tr><td style="text-align:center;width:17.7193%;background-color:rgb(235, 107, 86);"><span style="color:rgb(255, 255, 255);"><strong>Ledger</strong></span><br></td><td style="text-align:center;width:41.3724%;">Systems of record, supply chain, registrations, banking transactions<br></td><td style="text-align:center;width:40.8878%;">Amazon QLDB<br></td></tr></tbody></table>
+
+
+### Breaking up applications and databases
+
+As the industry changes, applications and databases change too. Today, with larger applications, you no longer see just one database supporting it. Instead, applications are broken into smaller services, each with their own purpose-built database supporting it. This shift removes the idea of a one-size-fits-all database and replaces it with a complimentary database strategy. You can give each database the appropriate functionality, performance, and scale that the workload requires.
+
 
 # Subtleties
 
